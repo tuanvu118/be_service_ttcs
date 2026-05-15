@@ -1,0 +1,158 @@
+name: ttcs-be
+
+x-backend-environment: &backend-environment
+  MONGO_URI: ""
+  MONGO_HOST: ${MONGO_HOST:-mongodb}
+  MONGO_PORT: ${MONGO_PORT:-27017}
+  MONGO_DATABASE: ${MONGO_DATABASE:-ttcs}
+  MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-ttcs_root}
+  MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change_me_mongo_root_password}
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_DB: ${REDIS_DB:-0}
+  RABBITMQ_HOST: ${RABBITMQ_HOST:-ttcs_rabbitmq}
+  RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+  RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+  RABBITMQ_PREFETCH_COUNT: ${RABBITMQ_PREFETCH_COUNT:-20}
+  BACKEND_CONTAINER_PORT: 8000
+  CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000}
+
+x-backend-common: &backend-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  working_dir: /app
+  command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
+  env_file:
+    - .env
+  environment: *backend-environment
+  volumes:
+    - ./:/app
+  depends_on:
+    mongodb:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  expose:
+    - "8000"
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+  restart: unless-stopped
+  networks:
+    - default
+    - ttcs_shared
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      backend_1:
+        condition: service_healthy
+      backend_2:
+        condition: service_healthy
+    environment:
+      BACKEND_CONTAINER_PORT: 8000
+    ports:
+      - "${BACKEND_HOST_PORT:-8000}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - default
+
+  mongodb:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-ttcs_root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change_me_mongo_root_password}
+    ports:
+      - "${MONGO_HOST_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - default
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - default
+
+  backend_1:
+    <<: *backend-common
+    environment:
+      <<: *backend-environment
+      ENABLE_APP_SCHEDULER: ${ENABLE_APP_SCHEDULER:-true}
+
+  backend_2:
+    <<: *backend-common
+    environment:
+      <<: *backend-environment
+      ENABLE_APP_SCHEDULER: "false"
+
+
+  k6:
+    image: grafana/k6:0.54.0
+    profiles:
+      - loadtest
+    working_dir: /scripts
+    command: run /scripts/qr_scan_1000rps.js
+    environment:
+      BASE_URL: ${K6_BASE_URL:-http://caddy/api}
+      ADMIN_USERNAME: ${K6_ADMIN_USERNAME:-ADMIN}
+      ADMIN_PASSWORD: ${K6_ADMIN_PASSWORD:-ADMIN}
+      USER_COUNT: ${K6_USER_COUNT:-1000}
+      RATE: ${K6_RATE:-1000}
+      DURATION: ${K6_DURATION:-1s}
+      SETUP_TIMEOUT: ${K6_SETUP_TIMEOUT:-10m}
+      PRE_ALLOCATED_VUS: ${K6_PRE_ALLOCATED_VUS:-1000}
+      MAX_VUS: ${K6_MAX_VUS:-2000}
+      SETUP_BATCH_SIZE: ${K6_SETUP_BATCH_SIZE:-100}
+      REGISTRATION_WINDOW_SECONDS: ${K6_REGISTRATION_WINDOW_SECONDS:-120}
+      EVENT_DURATION_SECONDS: ${K6_EVENT_DURATION_SECONDS:-900}
+      QR_WINDOW_SECONDS: ${K6_QR_WINDOW_SECONDS:-300}
+    volumes:
+      - ./loadtests:/scripts:ro
+    depends_on:
+      caddy:
+        condition: service_started
+    networks:
+      - default
+
+volumes:
+  caddy_data:
+  caddy_config:
+  mongodb_data:
+  redis_data:
+
+networks:
+  default:
+  ttcs_shared:
+    external: true
+    name: ttcs_shared

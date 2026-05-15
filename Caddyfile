@@ -1,0 +1,8 @@
+:80 {
+  reverse_proxy backend_1:{$BACKEND_CONTAINER_PORT:8000} backend_2:{$BACKEND_CONTAINER_PORT:8000} {
+    lb_policy round_robin
+    health_uri /api/health
+    health_interval 10s
+    health_timeout 3s
+  }
+}
