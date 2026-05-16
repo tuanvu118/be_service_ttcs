@@ -12,6 +12,9 @@ from aio_pika.abc import (
 )
 
 from configs.settings import (
+    RABBITMQ_CHECKIN_SYNC_EXCHANGE,
+    RABBITMQ_CHECKIN_SYNC_QUEUE,
+    RABBITMQ_CHECKIN_SYNC_ROUTING_KEY,
     RABBITMQ_PREFETCH_COUNT,
     RABBITMQ_URL,
     RABBITMQ_REGISTRATION_SYNC_EXCHANGE,
@@ -23,14 +26,22 @@ _connection: AbstractRobustConnection | None = None
 _channel: AbstractChannel | None = None
 _sync_exchange: AbstractExchange | None = None
 _sync_queue: AbstractQueue | None = None
+_checkin_sync_exchange: AbstractExchange | None = None
+_checkin_sync_queue: AbstractQueue | None = None
 _lock = asyncio.Lock()
 
 
 async def _ensure_rabbitmq() -> tuple[AbstractChannel, AbstractExchange, AbstractQueue]:
     global _connection, _channel, _sync_exchange, _sync_queue
+    global _checkin_sync_exchange, _checkin_sync_queue
 
     if _connection and not _connection.is_closed and _channel and not _channel.is_closed:
-        if _sync_exchange is not None and _sync_queue is not None:
+        if (
+            _sync_exchange is not None
+            and _sync_queue is not None
+            and _checkin_sync_exchange is not None
+            and _checkin_sync_queue is not None
+        ):
             return _channel, _sync_exchange, _sync_queue
 
     async with _lock:
@@ -54,6 +65,23 @@ async def _ensure_rabbitmq() -> tuple[AbstractChannel, AbstractExchange, Abstrac
                 durable=True,
             )
             await _sync_queue.bind(_sync_exchange, routing_key=RABBITMQ_REGISTRATION_SYNC_ROUTING_KEY)
+
+        if _checkin_sync_exchange is None:
+            _checkin_sync_exchange = await _channel.declare_exchange(
+                RABBITMQ_CHECKIN_SYNC_EXCHANGE,
+                ExchangeType.DIRECT,
+                durable=True,
+            )
+
+        if _checkin_sync_queue is None:
+            _checkin_sync_queue = await _channel.declare_queue(
+                RABBITMQ_CHECKIN_SYNC_QUEUE,
+                durable=True,
+            )
+            await _checkin_sync_queue.bind(
+                _checkin_sync_exchange,
+                routing_key=RABBITMQ_CHECKIN_SYNC_ROUTING_KEY,
+            )
 
     return _channel, _sync_exchange, _sync_queue
 
@@ -87,8 +115,16 @@ async def publish_registration_sync_message(payload: dict[str, Any], message_id:
         )
 
 
+async def get_checkin_sync_queue() -> AbstractQueue:
+    await _ensure_rabbitmq()
+    if _checkin_sync_queue is None:
+        raise RuntimeError("RabbitMQ check-in sync queue is not initialized")
+    return _checkin_sync_queue
+
+
 async def close_rabbitmq() -> None:
     global _connection, _channel, _sync_exchange, _sync_queue
+    global _checkin_sync_exchange, _checkin_sync_queue
 
     if _channel is not None and not _channel.is_closed:
         await _channel.close()
@@ -99,3 +135,5 @@ async def close_rabbitmq() -> None:
     _channel = None
     _sync_exchange = None
     _sync_queue = None
+    _checkin_sync_exchange = None
+    _checkin_sync_queue = None

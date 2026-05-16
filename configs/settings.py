@@ -80,6 +80,18 @@ RABBITMQ_REGISTRATION_SYNC_ROUTING_KEY = os.getenv(
     "RABBITMQ_REGISTRATION_SYNC_ROUTING_KEY",
     "registration.sync.requested",
 )
+RABBITMQ_CHECKIN_SYNC_EXCHANGE = os.getenv(
+    "RABBITMQ_CHECKIN_SYNC_EXCHANGE",
+    "attendance.sync.events",
+)
+RABBITMQ_CHECKIN_SYNC_QUEUE = os.getenv(
+    "RABBITMQ_CHECKIN_SYNC_QUEUE",
+    "attendance.sync.queue",
+)
+RABBITMQ_CHECKIN_SYNC_ROUTING_KEY = os.getenv(
+    "RABBITMQ_CHECKIN_SYNC_ROUTING_KEY",
+    "attendance.checkin.completed",
+)
 
 RABBITMQ_PREFETCH_COUNT = int(os.getenv("RABBITMQ_PREFETCH_COUNT", "20"))
 HTSK_REGISTER_LOCK_TTL_SECONDS = int(os.getenv("HTSK_REGISTER_LOCK_TTL_SECONDS", "10"))

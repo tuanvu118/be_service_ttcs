@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from fastapi import APIRouter, FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
@@ -24,6 +27,13 @@ from routers.users import router as users_router
 from routers.event_promotion import router as event_promotion_router
 from routers.upload import router as upload_router
 from scheduler.monthly_report import scheduler
+from worker.checkin_sync_worker import run_checkin_sync_worker
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+logging.getLogger("be_service").setLevel(logging.INFO)
 
 app = FastAPI(
     docs_url=f"{API_PREFIX}/docs",
@@ -60,6 +70,7 @@ async def on_startup():
     await init_db()
     init_cloudinary()
     await seed_roles()
+    asyncio.create_task(run_checkin_sync_worker())
     if ENABLE_APP_SCHEDULER and not scheduler.running:
         scheduler.start()
 
