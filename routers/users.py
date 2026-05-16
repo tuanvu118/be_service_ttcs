@@ -18,7 +18,7 @@ from schemas.users import (
     UserEventStatsResponse,
     UserPointsSummaryResponse,
 )
-from security import require_admin_or_manager_global, require_user
+from internal_auth import get_current_user_from_gateway
 from services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -36,7 +36,7 @@ async def list_users(
     email: str | None = Query(None),
     student_id: str | None = Query(None),
     class_name: str | None = Query(None),
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserListResponse:
     return await service.list_visible_users(
@@ -59,7 +59,7 @@ async def create_user(
     class_name: str = Form(...),
     avatar: UploadFile | None = File(None),
     date_of_birth: datetime = Form(None),
-    current_user: TokenData = Depends(require_admin_or_manager_global),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ):
     try:
@@ -87,7 +87,7 @@ async def update_current_user(
     class_name: str | None = Form(None),
     avatar: UploadFile | None = File(None),
     date_of_birth: datetime | None = Form(None),
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserRead:
     try:
@@ -107,7 +107,7 @@ async def update_current_user(
 
 @router.get("/me", response_model=UserProfileResponse)
 async def read_current_user(
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserProfileResponse:
     return await service.get_current_user_profile(current_user)
@@ -116,7 +116,7 @@ async def read_current_user(
 @router.get("/me/stats", response_model=UserEventStatsResponse)
 async def get_my_event_stats(
     semester_id: PydanticObjectId | None = Query(None),
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserEventStatsResponse:
     return await service.get_user_event_stats(
@@ -128,7 +128,7 @@ async def get_my_event_stats(
 @router.get("/{user_id}", response_model=UserProfileResponse, status_code=status.HTTP_200_OK)
 async def get_user_detail(
     user_id: PydanticObjectId,
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserProfileResponse:
     return await service.get_user_detail(user_id, current_user)
@@ -137,7 +137,7 @@ async def get_user_detail(
 @router.get("/{user_id}/points-summary", response_model=UserPointsSummaryResponse)
 async def get_user_points_summary(
     user_id: PydanticObjectId,
-    current_user: TokenData = Depends(require_admin_or_manager_global),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserPointsSummaryResponse:
     return await service.get_user_points_summary(user_id)
@@ -153,7 +153,7 @@ async def update_user(
     class_name: str | None = Form(None),
     avatar: UploadFile | None = File(None),
     date_of_birth: datetime | None = Form(None),
-    current_user: TokenData = Depends(require_admin_or_manager_global),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UserService = Depends(get_user_service),
 ) -> UserRead:
     try:

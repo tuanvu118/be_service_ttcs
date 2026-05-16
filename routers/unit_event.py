@@ -8,7 +8,7 @@ from schemas.unit_event import (
     UnitEventPaginationResponse,
 )
 from schemas.response import BaseResponse
-from security import require_manager, require_staff
+from internal_auth import get_current_user_from_gateway
 from services.unit_event_service import UnitEventService
 from repositories.unit_event_repo import UnitEventRepo
 from schemas.auth import TokenData
@@ -61,7 +61,7 @@ def parse_list_unit_ids(raw_value: Optional[str]) -> list[str]:
 @router.post("/", 
 response_model=UnitEventResponse,
 status_code=status.HTTP_201_CREATED,
-dependencies=[Depends(require_manager)]
+dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def Create_Unit_Event(
     title: str = Form(...),
@@ -77,7 +77,7 @@ async def Create_Unit_Event(
     registration_end: Optional[str] = Form(None),
     listUnitId: str = Form("[]"),
     semester_id: Optional[str] = Form(None),
-    current_user: TokenData = Depends(require_manager),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UnitEventService = Depends(get_unit_event_service),
 ) -> UnitEventResponse:
     """
@@ -113,12 +113,12 @@ async def Create_Unit_Event(
         return await service.create_unit_event_student_registration(data, current_user.sub)
     return await service.create_unit_event(data, current_user.sub)
 
-@router.get("/all", response_model=UnitEventPaginationResponse, dependencies=[Depends(require_manager)])
+@router.get("/all", response_model=UnitEventPaginationResponse, dependencies=[Depends(get_current_user_from_gateway)])
 async def Get_All_Unit_Events_By_Semester(
     semester_id: Optional[PydanticObjectId] = Query(None, alias="semesterId"),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1),
-    _ = Depends(require_manager),
+    _ = Depends(get_current_user_from_gateway),
     service: UnitEventService = Depends(get_unit_event_service),
 ) -> UnitEventPaginationResponse:
     """
@@ -130,10 +130,10 @@ async def Get_All_Unit_Events_By_Semester(
     """
     return await service.get_all_unit_events_by_semester_id(semester_id, skip=skip, limit=limit)
 
-@router.get("/my", response_model=List[UnitEventResponseByUnitId], dependencies=[Depends(require_staff)])
+@router.get("/my", response_model=List[UnitEventResponseByUnitId], dependencies=[Depends(get_current_user_from_gateway)])
 async def Get_My_Unit_Events_By_Semester(
     semester_id: PydanticObjectId = Query(..., alias="semesterId"),
-    current_user: TokenData = Depends(require_staff),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UnitEventService = Depends(get_unit_event_service),
 ) -> List[UnitEventResponseByUnitId]:
     """
@@ -146,7 +146,7 @@ async def Get_My_Unit_Events_By_Semester(
     return await service.get_unit_events_by_unit_id(current_user.sub, semester_id)
 
 
-@router.get("/{event_id}", response_model=UnitEventResponse, dependencies=[Depends(require_manager)])
+@router.get("/{event_id}", response_model=UnitEventResponse, dependencies=[Depends(get_current_user_from_gateway)])
 async def Get_Unit_Event_By_Id(
     event_id: PydanticObjectId,
     service: UnitEventService = Depends(get_unit_event_service),
@@ -158,7 +158,7 @@ async def Get_Unit_Event_By_Id(
     """
     return await service.get_unit_event_by_id(event_id)
 
-@router.put("/{event_id}", response_model=BaseResponse, dependencies=[Depends(require_manager)])
+@router.put("/{event_id}", response_model=BaseResponse, dependencies=[Depends(get_current_user_from_gateway)])
 async def Update_Unit_Event(
     event_id: PydanticObjectId,
     title: Optional[str] = Form(None),
@@ -171,7 +171,7 @@ async def Update_Unit_Event(
     registration_end: Optional[str] = Form(None),
     listUnitId: Optional[str] = Form(None),
     semester_id: Optional[str] = Form(None),
-    _ = Depends(require_manager),
+    _ = Depends(get_current_user_from_gateway),
     service: UnitEventService = Depends(get_unit_event_service),
 ) -> BaseResponse:
     from datetime import datetime
@@ -203,10 +203,10 @@ async def Update_Unit_Event(
     
     return await service.update_unit_event(event_id, data)
 
-@router.delete("/{event_id}", response_model=BaseResponse, dependencies=[Depends(require_manager)])
+@router.delete("/{event_id}", response_model=BaseResponse, dependencies=[Depends(get_current_user_from_gateway)])
 async def Delete_Unit_Event(
     event_id: PydanticObjectId,
-    _ = Depends(require_manager),
+    _ = Depends(get_current_user_from_gateway),
     service: UnitEventService = Depends(get_unit_event_service),
 ) -> BaseResponse:
     """

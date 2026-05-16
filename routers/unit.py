@@ -7,7 +7,7 @@ from repositories.unit_repo import UnitRepo
 from schemas.auth import TokenData
 from schemas.unit_member import UnitMemberCreate, UnitMemberListResponse, UnitMemberRead
 from schemas.unit import UnitCreate, UnitListResponse, UnitRead, UnitUpdate
-from security import require_admin, require_user
+from internal_auth import get_current_user_from_gateway
 from services.unit_service import UnitService
 
 
@@ -22,7 +22,7 @@ def get_unit_service() -> UnitService:
     "",
     response_model=UnitRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def create_unit(
     name: str = Form(...),
@@ -95,7 +95,7 @@ async def update_unit(
     fb_url: str | None = Form(None),
     logo: UploadFile | None = None,
     cover: UploadFile | None = None,
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UnitService = Depends(get_unit_service),
 ) -> UnitRead:
     payload = UnitUpdate(
@@ -113,7 +113,7 @@ async def update_unit(
 @router.delete(
     "/{unit_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def delete_unit(
     unit_id: PydanticObjectId,
@@ -130,7 +130,7 @@ async def delete_unit(
 async def add_unit_member(
     unit_id: PydanticObjectId,
     payload: UnitMemberCreate,
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UnitService = Depends(get_unit_service),
 ) -> UnitMemberRead:
     return await service.add_member(
@@ -154,7 +154,7 @@ async def list_unit_members(
     student_id: str | None = Query(None),
     class_name: str | None = Query(None),
     semester_id: PydanticObjectId | None = None,
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UnitService = Depends(get_unit_service),
 ) -> UnitMemberListResponse:
     return await service.list_members(
@@ -178,7 +178,7 @@ async def remove_unit_member(
     unit_id: PydanticObjectId,
     user_id: PydanticObjectId,
     semester_id: PydanticObjectId | None = None,
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: UnitService = Depends(get_unit_service),
 ) -> None:
     await service.remove_member(

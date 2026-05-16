@@ -3,7 +3,7 @@ from datetime import datetime
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Header, Query, status, Form, File, UploadFile
 from exceptions import ErrorCode, app_exception
-from security import require_manager, require_staff
+from internal_auth import get_current_user_from_gateway
 from schemas.auth import TokenData
 from schemas.event_promotion import (
     EventPromotionCreate, 
@@ -28,7 +28,7 @@ def parse_utc_dt(dt_str: str) -> datetime:
     "",
     response_model=EventPromotionRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_staff)]
+    dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def create_promotion(
     title: str = Form(...),
@@ -38,7 +38,7 @@ async def create_promotion(
     event_end: Optional[str] = Form(None),
     external_links: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
-    current_user: TokenData = Depends(require_staff),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     x_unit_id: str = Header(..., alias="X-Unit-Id")
 ):
     try:
@@ -71,21 +71,21 @@ async def create_promotion(
 @router.get(
     "/admin",
     response_model=EventPromotionPaginationResponse,
-    dependencies=[Depends(require_manager)]
+    dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def list_promotions_for_admin(
     status: Optional[str] = Query(None),
     semester_id: Optional[PydanticObjectId] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1),
-    _ = Depends(require_manager)
+    _ = Depends(get_current_user_from_gateway)
 ):
     return await EventPromotionService.get_all_for_admin(status, semester_id, skip, limit)
 
 @router.get(
     "/my-unit",
     response_model=EventPromotionPaginationResponse,
-    dependencies=[Depends(require_staff)]
+    dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def list_promotions_for_unit(
     status: Optional[str] = Query(None),
@@ -93,7 +93,7 @@ async def list_promotions_for_unit(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1),
     x_unit_id: str = Header(..., alias="X-Unit-Id"),
-    _ = Depends(require_staff)
+    _ = Depends(get_current_user_from_gateway)
 ):
     try:
         u_id = PydanticObjectId(x_unit_id)
@@ -124,7 +124,7 @@ async def get_promotion_detail(id: PydanticObjectId):
 @router.put(
     "/{id}",
     response_model=EventPromotionRead,
-    dependencies=[Depends(require_staff)]
+    dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def update_promotion(
     id: PydanticObjectId,
@@ -135,7 +135,7 @@ async def update_promotion(
     external_links: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     x_unit_id: str = Header(..., alias="X-Unit-Id"),
-    _ = Depends(require_staff)
+    _ = Depends(get_current_user_from_gateway)
 ):
     try:
         import json
@@ -162,23 +162,23 @@ async def update_promotion(
 @router.put(
     "/{id}/status",
     response_model=EventPromotionRead,
-    dependencies=[Depends(require_manager)]
+    dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def update_promotion_status(
     id: PydanticObjectId,
     data: EventPromotionStatusUpdate,
-    _ = Depends(require_manager)
+    _ = Depends(get_current_user_from_gateway)
 ):
     return await EventPromotionService.update_status(id, data)
 
 @router.delete(
     "/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_staff)]
+    dependencies=[Depends(get_current_user_from_gateway)]
 )
 async def delete_promotion(
     id: PydanticObjectId,
     x_unit_id: str = Header(..., alias="X-Unit-Id"),
-    _ = Depends(require_staff)
+    _ = Depends(get_current_user_from_gateway)
 ):
     await EventPromotionService.delete_promotion(id, PydanticObjectId(x_unit_id))

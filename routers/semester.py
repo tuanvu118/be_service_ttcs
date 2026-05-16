@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, status
 from repositories.semester_repo import SemesterRepo
 from schemas.auth import TokenData
 from schemas.semester import SemesterCreate, SemesterListResponse, SemesterRead, SemesterUpdate
-from security import require_global_admin, require_user
+from internal_auth import get_current_user_from_gateway
 from services.semester_service import SemesterService
 
 
@@ -26,7 +26,7 @@ def get_semester_service() -> SemesterService:
 )
 async def create_semester(
     payload: SemesterCreate,
-    current_user: TokenData = Depends(require_global_admin),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: SemesterService = Depends(get_semester_service),
 ) -> SemesterRead:
     return await service.create_semester(payload)
@@ -78,7 +78,7 @@ async def get_current_semester(
 async def update_semester(
     semester_id: PydanticObjectId,
     payload: SemesterUpdate,
-    current_user: TokenData = Depends(require_global_admin),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     service: SemesterService = Depends(get_semester_service),
 ) -> SemesterRead:
     return await service.update_semester(semester_id, payload)

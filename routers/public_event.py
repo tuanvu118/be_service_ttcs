@@ -9,7 +9,7 @@ from bson.errors import InvalidId
 
 from exceptions import ErrorCode, app_exception
 from schemas.public_event import PublicEventCreate, PublicEventRead, PublicEventUpdate, PublicEventPaginationResponse
-from security import require_manager
+from internal_auth import get_current_user_from_gateway
 from services.public_event_service import PublicEventService
 
 
@@ -47,7 +47,7 @@ async def create_event(
     max_participants: int = Form(0),
     semester_id: Optional[str] = Form(None),
     image: UploadFile = File(None),
-    _=Depends(require_manager),
+    _=Depends(get_current_user_from_gateway),
 
 ):
     # Parse form_fields string to list of dicts
@@ -79,7 +79,7 @@ async def get_events(
     semester_id: Optional[PydanticObjectId] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1),
-    _=Depends(require_manager),
+    _=Depends(get_current_user_from_gateway),
 ):
     return await PublicEventService.get_events(semester_id=semester_id, skip=skip, limit=limit)
 
@@ -123,7 +123,7 @@ async def update_event(
     max_participants: Optional[int] = Form(None),
     semester_id: Optional[str] = Form(None),
     image: UploadFile = File(None),
-    _=Depends(require_manager),
+    _=Depends(get_current_user_from_gateway),
 
 ):
     update_data = {}
@@ -156,7 +156,7 @@ async def update_event(
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(
     event_id: PydanticObjectId,
-    _=Depends(require_manager),
+    _=Depends(get_current_user_from_gateway),
 ):
     await PublicEventService.delete_event(event_id)
 

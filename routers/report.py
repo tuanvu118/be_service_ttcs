@@ -11,7 +11,7 @@ from schemas.report import (
     ReportSummary,
     ReportPaginationResponse,
 )
-from security import get_current_user, require_manager, require_staff
+from internal_auth import get_current_user_from_gateway
 from services.report import ReportService
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
     "/all",
     response_model=ReportPaginationResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_manager)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def get_all_reports(
     month: Optional[int] = None,
@@ -38,7 +38,7 @@ async def get_all_reports(
     "/",
     response_model=ReportPaginationResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_staff)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def get_reports(
     x_unit_id: PydanticObjectId = Header(..., alias="X-Unit-Id"),
@@ -55,11 +55,11 @@ async def get_reports(
     "/{report_id}",
     response_model=ReportDetail,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def get_report_detail(
     report_id: PydanticObjectId,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user_from_gateway)
 ):
     return await ReportService.get_report_detail(report_id, current_user)
 
@@ -67,7 +67,7 @@ async def get_report_detail(
     "/{report_id}/internal-events",
     response_model=InternalEventRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_staff)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def create_internal_event(
     report_id: PydanticObjectId,
@@ -83,7 +83,7 @@ async def create_internal_event(
     "/{report_id}/internal-events/{event_id}",
     response_model=InternalEventRead,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_staff)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def update_internal_event(
     report_id: PydanticObjectId,
@@ -100,7 +100,7 @@ async def update_internal_event(
 @router.delete(
     "/{report_id}/internal-events/{event_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_staff)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def delete_internal_event(
     report_id: PydanticObjectId,
@@ -114,7 +114,7 @@ async def delete_internal_event(
     "/{report_id}/submit",
     response_model=ReportDetail,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_staff)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def submit_report(
     report_id: PydanticObjectId,
@@ -126,7 +126,7 @@ async def submit_report(
     "/{report_id}/status",
     response_model=ReportDetail,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_manager)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def update_report_status(
     report_id: PydanticObjectId,
@@ -139,7 +139,7 @@ async def update_report_status(
 @router.get(
     "/export/summary",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_manager)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def export_summary_excel(
     month: Optional[int] = None,
@@ -162,7 +162,7 @@ async def export_summary_excel(
 )
 async def export_detailed_excel(
     report_id: PydanticObjectId,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user_from_gateway)
 ):
     buffer = await ReportService.export_detailed_excel(report_id, current_user)
     return StreamingResponse(

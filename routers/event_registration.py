@@ -12,7 +12,7 @@ from schemas.event_registration import (
     MyEventDetailResponse,
     MyEventRegistrationResponse,
 )
-from security import require_admin, require_user
+from internal_auth import get_current_user_from_gateway
 from services.event_registration_service import EventRegistrationService
 
 
@@ -29,7 +29,7 @@ async def register_public_event(
     request: Request,
     event_id: PydanticObjectId = Path(...),
     body: EventRegistrationRequest = None,
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     x_idempotency_key: str = Header(default=None, alias="X-Idempotency-Key"),
 ):
     return await EventRegistrationService.register_public_event(
@@ -48,7 +48,7 @@ async def register_public_event(
 )
 async def cancel_registration(
     event_id: PydanticObjectId = Path(...),
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
 ):
     await EventRegistrationService.cancel(
         event_id=event_id,
@@ -61,7 +61,7 @@ async def cancel_registration(
     response_model=List[MyEventRegistrationResponse],
 )
 async def get_my_registrations(
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
 ):
     return await EventRegistrationService.get_my_registrations(
         user_id=PydanticObjectId(current_user.sub)
@@ -71,7 +71,7 @@ async def get_my_registrations(
 @router.get(
     "/{event_id}/registrations",
     response_model=List[EventRegistrationUserResponse],
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(get_current_user_from_gateway)],
 )
 async def get_event_registrations(
     event_id: PydanticObjectId = Path(...),
@@ -85,7 +85,7 @@ async def get_event_registrations(
 )
 async def get_my_event_detail(
     event_id: PydanticObjectId = Path(...),
-    current_user: TokenData = Depends(require_user),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
 ):
     return await EventRegistrationService.get_my_event_detail(
         event_id=event_id,

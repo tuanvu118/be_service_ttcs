@@ -8,8 +8,8 @@ from models.refresh_tokens import RefreshTokenSession
 from repositories.refresh_token_repo import RefreshTokenRepo
 from repositories.user_repo import UserRepo
 from schemas.auth import Token
-from security import (
-    REFRESH_TOKEN_EXPIRE_DAYS,
+from configs.settings import REFRESH_TOKEN_EXPIRE_DAYS
+from utils.token_utils import (
     create_access_token,
     create_refresh_token,
     decode_token,

@@ -14,7 +14,7 @@ from schemas.rbac import (
     UserRoleAssignmentRead,
 )
 from schemas.auth import TokenData
-from security import require_admin
+from internal_auth import get_current_user_from_gateway
 from services.rbac_service import RBACService
 
 
@@ -27,7 +27,7 @@ def get_rbac_service() -> RBACService:
 
 @router.get("/roles", response_model=List[RoleRead], status_code=status.HTTP_200_OK)
 async def list_roles(
-    current_user: TokenData = Depends(require_admin),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     rbac_service: RBACService = Depends(get_rbac_service),
 ) -> List[RoleRead]:
     return await rbac_service.list_roles()
@@ -41,7 +41,7 @@ async def list_roles(
 async def list_user_role_assignments(
     user_id: PydanticObjectId,
     semester_id: PydanticObjectId | None = None,
-    current_user: TokenData = Depends(require_admin),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     rbac_service: RBACService = Depends(get_rbac_service),
 ) -> UserRoleAssignmentListResponse:
     return await rbac_service.list_user_role_assignments(user_id, semester_id)
@@ -50,7 +50,7 @@ async def list_user_role_assignments(
 @router.post("/assign-role", response_model=UserRoleAssignmentRead, status_code=status.HTTP_201_CREATED)
 async def assign_role(
     payload: AssignRoleRequest,
-    current_user: TokenData = Depends(require_admin),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     rbac_service: RBACService = Depends(get_rbac_service),
 ):
     assignment = await rbac_service.assign_role(
@@ -76,7 +76,7 @@ async def assign_role(
 @router.delete("/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_role_assignment(
     assignment_id: PydanticObjectId,
-    current_user: TokenData = Depends(require_admin),
+    current_user: TokenData = Depends(get_current_user_from_gateway),
     rbac_service: RBACService = Depends(get_rbac_service),
 ) -> Response:
     await rbac_service.remove_role_assignment(assignment_id)
