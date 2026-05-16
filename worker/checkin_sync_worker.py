@@ -82,10 +82,11 @@ async def run_checkin_sync_worker() -> None:
 
     async with queue.iterator() as queue_iterator:
         async for message in queue_iterator:
-            async with message.process(requeue=True):
+            async with message.process(ignore_processed=True):
                 try:
                     payload = json.loads(message.body.decode("utf-8"))
                     await process_sync_message(payload)
+                    await message.ack()
                 except (
                     json.JSONDecodeError,
                     UnicodeDecodeError,
@@ -99,12 +100,15 @@ async def run_checkin_sync_worker() -> None:
                         message.message_id,
                         exc,
                     )
-                except Exception:
-                    logger.exception(
-                        "[be_ttcs: Lỗi] Lỗi khi xử lý message đồng bộ check-in | message_id=%s",
+                    await message.reject(requeue=False)
+                except Exception as exc:
+                    logger.error(
+                        "[be_ttcs: Lỗi] Lỗi hệ thống hoặc DB khi xử lý message đồng bộ check-in, trả lại queue để thử lại | message_id=%s | error=%s",
                         message.message_id,
+                        exc,
                     )
-                    raise
+                    await message.reject(requeue=True)
+                    await asyncio.sleep(2)
 
 
 async def _main() -> None:
