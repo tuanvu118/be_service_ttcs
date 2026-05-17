@@ -150,8 +150,6 @@ class EventRegistrationService:
 
         return EventRegistrationResponse.model_validate(reg)
 
-
-
     # -------------------------
     # CANCEL
     # -------------------------

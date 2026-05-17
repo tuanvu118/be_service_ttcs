@@ -252,6 +252,30 @@ class ReportService:
         await ReportService._check_deadline_and_status(report)
         unit_events = await UnitEventRepo.get_by_ids(report.unit_event_ids)
 
+        unit_events_with_status = []
+        for ue in unit_events:
+            sub = await UnitEventSubmissionsRepo().get_by_unit_event_id_and_unit_id(ue.id, report.unit_id)
+            if sub:
+                if sub.status == UnitEventSubmissionStatus.APPROVED:
+                    status_str = "DA_DUYET"
+                elif sub.status == UnitEventSubmissionStatus.REJECTED:
+                    status_str = "TU_CHOI"
+                else:
+                    status_str = "CHO_DUYET"
+            else:
+                status_str = "CHO_DUYET"
+            
+            unit_events_with_status.append(
+                UnitEventSummary(
+                    id=ue.id,
+                    title=ue.title,
+                    type=ue.type,
+                    point=float(ue.point) if ue.point else 0,
+                    created_at=ue.created_at,
+                    status=status_str
+                )
+            )
+
         return ReportDetail(
             id=report.id,
             unit_id=report.unit_id,
@@ -260,16 +284,7 @@ class ReportService:
             status=report.status,
             note=report.note,
             updated_at=report.updated_at,
-            unit_events=[
-                UnitEventSummary(
-                    id=ue.id, 
-                    title=ue.title,
-                    type=ue.type,
-                    point=float(ue.point) if ue.point else 0,
-                    created_at=ue.created_at
-                )
-                for ue in unit_events
-            ],
+            unit_events=unit_events_with_status,
             internal_events=[
                 InternalEventRead(**event.model_dump())
                 for event in report.internal_events

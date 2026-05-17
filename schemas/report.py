@@ -42,6 +42,7 @@ class UnitEventSummary(BaseModel):
     type: str
     point: float = 0
     created_at: datetime
+    status: Optional[str] = None
 
     @field_validator("created_at", mode="before", check_fields=False)
     @classmethod
