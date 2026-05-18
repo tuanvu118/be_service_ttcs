@@ -12,7 +12,11 @@ from configs.database import init_db
 from configs.seed_roles import seed_roles
 from configs.rabbitmq import close_rabbitmq
 from configs.redis_config import close_redis
-from configs.settings import API_PREFIX, ENABLE_APP_SCHEDULER
+from configs.settings import (
+    API_PREFIX,
+    ENABLE_APP_SCHEDULER,
+    ENABLE_EMBEDDED_CHECKIN_SYNC_WORKER,
+)
 from middleware.cors import register_cors
 from routers.auth import router as auth_router
 from routers.event_registration import router as event_registration_router
@@ -70,7 +74,8 @@ async def on_startup():
     await init_db()
     init_cloudinary()
     await seed_roles()
-    asyncio.create_task(run_checkin_sync_worker())
+    if ENABLE_EMBEDDED_CHECKIN_SYNC_WORKER:
+        asyncio.create_task(run_checkin_sync_worker())
     if ENABLE_APP_SCHEDULER and not scheduler.running:
         scheduler.start()
 
