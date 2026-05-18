@@ -77,8 +77,31 @@ async def process_sync_message(payload: dict[str, Any]) -> None:
 
 async def run_checkin_sync_worker() -> None:
     await init_db()
-    queue = await get_checkin_sync_queue()
-    logger.info("[be_ttcs: Thông báo] Đã khởi động Worker đồng bộ Check-in. Đang chờ tin nhắn...")
+    
+    # Thêm vòng lặp thử lại kết nối để tránh lỗi khi RabbitMQ chưa khởi động xong
+    retries = 10
+    delay = 3
+    queue = None
+    for attempt in range(retries):
+        try:
+            queue = await get_checkin_sync_queue()
+            logger.info("[be_ttcs: Thông báo] Đã kết nối RabbitMQ và khởi động Worker đồng bộ Check-in. Đang chờ tin nhắn...")
+            break
+        except Exception as exc:
+            if attempt == retries - 1:
+                logger.error("[be_ttcs: Lỗi] Không thể kết nối RabbitMQ sau %s lần thử. Dừng worker.", retries)
+                raise exc
+            logger.warning(
+                "[be_ttcs: Cảnh báo] Lỗi kết nối RabbitMQ (lần thử %s/%s): %s. Thử lại sau %ss...",
+                attempt + 1,
+                retries,
+                exc,
+                delay,
+            )
+            await asyncio.sleep(delay)
+
+    if queue is None:
+        return
 
     async with queue.iterator() as queue_iterator:
         async for message in queue_iterator:

@@ -30,6 +30,7 @@ from routers.unit_event_submissions import router as unit_event_submissions_rout
 from routers.users import router as users_router
 from routers.event_promotion import router as event_promotion_router
 from routers.upload import router as upload_router
+from routers.manual_attendance import router as manual_attendance_router
 from scheduler.monthly_report import scheduler
 from worker.checkin_sync_worker import run_checkin_sync_worker
 
@@ -66,6 +67,7 @@ api_router.include_router(unit_event_router)
 api_router.include_router(unit_event_submissions_router)
 api_router.include_router(event_promotion_router)
 api_router.include_router(upload_router)
+api_router.include_router(manual_attendance_router)
 app.include_router(api_router)
 
 

@@ -150,9 +150,7 @@ class EventRegistrationService:
 
         return EventRegistrationResponse.model_validate(reg)
 
-    # -------------------------
     # CANCEL
-    # -------------------------
     @staticmethod
     async def cancel(
         event_id: PydanticObjectId,
@@ -188,12 +186,8 @@ class EventRegistrationService:
 
             await redis.srem(u_key, user_id_str)  # type: ignore[misc]
         except Exception:
-            # Redis sync fail không ảnh hưởng đến DB (DB đã xóa rồi)
             pass
 
-    # -------------------------
-    # READ OPERATIONS (không thay đổi)
-    # -------------------------
     @staticmethod
     async def get_my_registrations(
         user_id: PydanticObjectId,

@@ -9,6 +9,7 @@ from models.user_unit import UserUnit
 from repositories.semester_repo import SemesterRepo
 from repositories.unit_repo import UnitRepo
 from repositories.user_repo import UserRepo
+from repositories.user_role_repo import UserRoleRepo
 from repositories.user_unit_repo import UserUnitRepo
 from schemas.auth import TokenData
 from schemas.unit_member import UnitMemberCreate, UnitMemberListResponse, UnitMemberRead
@@ -23,11 +24,13 @@ class UnitService:
         user_repo: UserRepo | None = None,
         semester_repo: SemesterRepo | None = None,
         user_unit_repo: UserUnitRepo | None = None,
+        user_role_repo: UserRoleRepo | None = None,
     ) -> None:
         self.repo = repo
         self.user_repo = user_repo or UserRepo()
         self.semester_repo = semester_repo or SemesterRepo()
         self.user_unit_repo = user_unit_repo or UserUnitRepo()
+        self.user_role_repo = user_role_repo or UserRoleRepo()
 
     @staticmethod
     def _ensure_member_management_permission(
@@ -285,3 +288,12 @@ class UnitService:
             app_exception(ErrorCode.USER_NOT_IN_UNIT)
 
         await self.user_unit_repo.deactivate(membership)
+
+        # Deactivate all active user roles in this unit for this semester
+        active_roles = await self.user_role_repo.list_active_by_user_and_unit(
+            user_id=user_id,
+            unit_id=unit_id,
+            semester_id=semester.id,
+        )
+        for role in active_roles:
+            await self.user_role_repo.deactivate(role)
