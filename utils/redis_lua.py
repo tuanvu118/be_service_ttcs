@@ -60,15 +60,11 @@ async def run_lua(event_id: str, user_id: str, max_participants: int, idempotenc
     u_key = _users_key(event_id)
     i_key = _idempotency_key(idempotency_key, event_id, user_id)
 
-    # Debug: in ra max_participants và key
-    logger.warning(f"🔍 run_lua: event={event_id}, user={user_id}, max_p={max_participants}, u_key={u_key}")
-
     # Đảm bảo set tồn tại (expire an toàn)
     await redis.expire(u_key, _USERS_SET_TTL)
 
     # Kiểm tra trực tiếp Redis trước khi gọi script (chỉ để debug)
     current = await redis.scard(u_key)
-    logger.warning(f"🔍 Before Lua: current members in {u_key} = {current}")
 
     result = await redis.eval(
         LUA_REGISTER_SCRIPT,
@@ -80,11 +76,9 @@ async def run_lua(event_id: str, user_id: str, max_participants: int, idempotenc
         str(_IDEMPOTENCY_TTL),
     )
     result = int(result)
-    logger.warning(f"🔍 Lua result = {result}")
 
     # Sau khi thực thi, kiểm tra lại
     after = await redis.scard(u_key)
-    logger.warning(f"🔍 After Lua: current members = {after}")
     return result
 
 async def rollback(event_id: str, user_id: str, idempotency_key: str | None = None) -> None:

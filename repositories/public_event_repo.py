@@ -2,9 +2,18 @@ from datetime import datetime
 from typing import List, Optional
 
 from beanie import PydanticObjectId
+from bson import Decimal128
 
 from models.public_event import PublicEvent
 
+def convert_bson_types(data):
+    if isinstance(data, dict):
+        return {k: convert_bson_types(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_bson_types(v) for v in data]
+    elif isinstance(data, Decimal128):
+        return data.to_decimal()
+    return data
 
 class PublicEventRepository:
 
@@ -18,20 +27,6 @@ class PublicEventRepository:
     async def get_by_id(event_id: PydanticObjectId):
         return await PublicEvent.get(event_id)
 
-    @staticmethod
-    async def get_all(
-        semester_id: Optional[PydanticObjectId] = None,
-        skip: int = 0,
-        limit: int = 10
-    ):
-        query = {}
-        if semester_id:
-            query["semester_id"] = semester_id
-            
-        cursor = PublicEvent.find(query)
-        total = await cursor.count()
-        items = await cursor.sort("-created_at").skip(skip).limit(limit).to_list()
-        return items, total
 
     @staticmethod
     async def update(event_id: PydanticObjectId, data: dict):
@@ -55,40 +50,133 @@ class PublicEventRepository:
             {"_id": {"$in": ids}}
         ).to_list()
 
+
     @staticmethod
-    async def get_valid_events(
-        now: datetime, 
-        semester_id: Optional[PydanticObjectId] = None,
-        search: Optional[str] = None,
-        started_after: Optional[datetime] = None,
-        started_before: Optional[datetime] = None,
+    async def get_all_with_participants(
+        match_filter: dict,
         skip: int = 0,
         limit: int = 10
-    ):
-        query = {
-            "event_end": {"$gte": now}
-        }
+    ) -> (List[dict], int):
+        total = await PublicEvent.find(match_filter).count()
+        
+        pipeline = [
+            {"$match": match_filter},
+            {"$sort": {"created_at": -1}},
+            {"$skip": skip},
+            {"$limit": limit},
+            {
+                "$lookup": {
+                    "from": "event_registrations",
+                    "let": {"event_id": "$_id"},
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$and": [
+                                        {"$eq": ["$event_id", "$$event_id"]},
+                                        {"$eq": ["$event_type", "public"]}
+                                    ]
+                                }
+                            }
+                        },
+                        {"$count": "count"}
+                    ],
+                    "as": "registration_counts"
+                }
+            },
+            {
+                "$project": {
+                    "id": "$_id",
+                    "_id": 0,
+                    "title": 1,
+                    "description": 1,
+                    "image_url": 1,
+                    "point": 1,
+                    "location": 1,
+                    "max_participants": 1,
+                    "registration_start": 1,
+                    "registration_end": 1,
+                    "event_start": 1,
+                    "event_end": 1,
+                    "semester_id": 1,
+                    "form_fields": 1,
+                    "created_at": 1,
+                    "current_participants": {
+                        "$ifNull": [
+                            {"$arrayElemAt": ["$registration_counts.count", 0]},
+                            0
+                        ]
+                    }
+                }
+            }
+        ]
+        
+        raw_items = await PublicEvent.get_pymongo_collection().aggregate(pipeline).to_list(length=None)
+        items = convert_bson_types(raw_items)
+        return items, total
 
-        if semester_id:
-            query["semester_id"] = semester_id
-            
-        if search:
-            query["$or"] = [
-                {"title": {"$regex": search, "$options": "i"}},
-                {"description": {"$regex": search, "$options": "i"}}
-            ]
-            
-        if started_after or started_before:
-            time_query = {}
-            if started_after:
-                time_query["$gte"] = started_after
-            if started_before:
-                time_query["$lte"] = started_before
-            query["event_start"] = time_query
-            
-        cursor = PublicEvent.find(query)
-        total = await cursor.count()
-        items = await cursor.sort("event_start").skip(skip).limit(limit).to_list()
+    @staticmethod
+    async def get_valid_with_participants(
+        match_filter: dict,
+        skip: int = 0,
+        limit: int = 10
+    ) -> (List[dict], int):
+        total = await PublicEvent.find(match_filter).count()
+        
+        pipeline = [
+            {"$match": match_filter},
+            {"$sort": {"event_start": 1}},
+            {"$skip": skip},
+            {"$limit": limit},
+            {
+                "$lookup": {
+                    "from": "event_registrations",
+                    "let": {"event_id": "$_id"},
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$and": [
+                                        {"$eq": ["$event_id", "$$event_id"]},
+                                        {"$eq": ["$event_type", "public"]}
+                                    ]
+                                }
+                            }
+                        },
+                        {"$count": "count"}
+                    ],
+                    "as": "registration_counts"
+                }
+            },
+            {
+                "$project": {
+                    "id": "$_id",
+                    "_id": 0,
+                    "title": 1,
+                    "description": 1,
+                    "image_url": 1,
+                    "point": 1,
+                    "location": 1,
+                    "max_participants": 1,
+                    "registration_start": 1,
+                    "registration_end": 1,
+                    "event_start": 1,
+                    "event_end": 1,
+                    "semester_id": 1,
+                    "form_fields": 1,
+                    "created_at": 1,
+                    "current_participants": {
+                        "$ifNull": [
+                            {"$arrayElemAt": ["$registration_counts.count", 0]},
+                            0
+                        ]
+                    }
+                }
+            }
+        ]
+        
+        raw_items = await PublicEvent.get_pymongo_collection().aggregate(pipeline).to_list(length=None)
+        items = convert_bson_types(raw_items)
         return items, total
 
     @staticmethod

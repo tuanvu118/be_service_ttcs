@@ -3,6 +3,16 @@ from datetime import datetime, timezone
 from typing import List
 from beanie import PydanticObjectId
 from typing import Optional
+from bson import Decimal128
+
+def convert_bson_types(data):
+    if isinstance(data, dict):
+        return {k: convert_bson_types(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_bson_types(v) for v in data]
+    elif isinstance(data, Decimal128):
+        return data.to_decimal()
+    return data
 
 class UnitEventRepo:
     async def create(self, unit_event: UnitEvent) -> UnitEvent:
@@ -11,22 +21,6 @@ class UnitEventRepo:
     async def get_all_active(self) -> List[UnitEvent]:
         return await UnitEvent.find(UnitEvent.deleted_at == None).to_list()
 
-    async def list_active_by_semester_id(
-        self, 
-        semester_id: Optional[PydanticObjectId] = None,
-        skip: int = 0,
-        limit: int = 10
-    ) -> (List[UnitEvent], int):
-        query = {
-            "deleted_at": None
-        }
-        if semester_id and semester_id != 'all':
-            query["semesterId"] = semester_id
-            
-        cursor = UnitEvent.find(query)
-        total = await cursor.count()
-        items = await cursor.sort("-created_at").skip(skip).limit(limit).to_list()
-        return items, total
 
     async def list_by_unit_id(self, unit_id: PydanticObjectId) -> List[UnitEvent]:
         """Lấy danh sách unit_events có unit_id trong listUnitId."""
@@ -77,4 +71,73 @@ class UnitEventRepo:
         return await UnitEvent.find(
             {"_id": {"$in": event_ids}}
         ).to_list()
+
+    async def list_active_by_semester_id_with_units(
+        self,
+        semester_id: Optional[PydanticObjectId] = None,
+        skip: int = 0,
+        limit: int = 10
+    ) -> (List[dict], int):
+        match_filter = {"deleted_at": None}
+        if semester_id:
+            match_filter["semesterId"] = semester_id
+
+        total = await UnitEvent.find(match_filter).count()
+
+        pipeline = [
+            {"$match": match_filter},
+            {"$sort": {"created_at": -1}},
+            {"$skip": skip},
+            {"$limit": limit},
+            {
+                "$lookup": {
+                    "from": "units",
+                    "localField": "listUnitId",
+                    "foreignField": "_id",
+                    "as": "assigned_units"
+                }
+            },
+            {
+                "$project": {
+                    "id": "$_id",
+                    "_id": 0,
+                    "title": 1,
+                    "description": 1,
+                    "location": 1,
+                    "point": 1,
+                    "type": 1,
+                    "event_start": 1,
+                    "event_end": 1,
+                    "registration_start": 1,
+                    "registration_end": 1,
+                    "is_student_registration": 1,
+                    "limit_student_registration_in_one_unit": 1,
+                    "semesterId": 1,
+                    "created_at": 1,
+                    "created_by": 1,
+                    "assigned_units": {
+                        "$map": {
+                            "input": "$assigned_units",
+                            "as": "unit",
+                            "in": {
+                                "id": "$$unit._id",
+                                "name": "$$unit.name",
+                                "logo": "$$unit.logo",
+                                "type": "$$unit.type",
+                                "cover_url": "$$unit.cover_url",
+                                "introduction": "$$unit.introduction",
+                                "established_year": "$$unit.established_year",
+                                "email": "$$unit.email",
+                                "fb_url": "$$unit.fb_url",
+                                "member_count": "$$unit.member_count"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+
+        raw_items = await UnitEvent.get_pymongo_collection().aggregate(pipeline).to_list(length=None)
+        items = convert_bson_types(raw_items)
+        return items, total
 

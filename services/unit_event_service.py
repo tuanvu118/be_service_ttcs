@@ -253,8 +253,10 @@ class UnitEventService:
             parsed_semester_id = self._parse_object_id(semester_id, "semesterId")
             await self.semester_service.get_semester_by_id(parsed_semester_id)
 
-        events, total = await self.repo.list_active_by_semester_id(parsed_semester_id, skip=skip, limit=limit)
-        items = [await self._build_event_response(event) for event in events]
+        raw_items, total = await self.repo.list_active_by_semester_id_with_units(
+            semester_id=parsed_semester_id, skip=skip, limit=limit
+        )
+        items = [UnitEventResponse.model_validate(item) for item in raw_items]
         return {"items": items, "total": total}
 
     async def get_unit_events_by_unit_id(

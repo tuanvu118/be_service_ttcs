@@ -111,8 +111,14 @@ class PublicEventService:
         skip: int = 0,
         limit: int = 10
     ):
-        events, total = await PublicEventRepository.get_all(semester_id=semester_id, skip=skip, limit=limit)
-        items = [await PublicEventService._to_public_event_read(e) for e in events]
+        match_filter = {}
+        if semester_id:
+            match_filter["semester_id"] = semester_id
+            
+        raw_items, total = await PublicEventRepository.get_all_with_participants(
+            match_filter=match_filter, skip=skip, limit=limit
+        )
+        items = [PublicEventRead.model_validate(item) for item in raw_items]
         return {"items": items, "total": total}
 
     @staticmethod
@@ -125,6 +131,19 @@ class PublicEventService:
     ):
         now = datetime.now(timezone.utc)
         
+        match_filter = {
+            "event_end": {"$gte": now}
+        }
+        
+        if semester_id:
+            match_filter["semester_id"] = semester_id
+            
+        if search:
+            match_filter["$or"] = [
+                {"title": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}}
+            ]
+            
         started_after = None
         started_before = None
         
@@ -137,16 +156,18 @@ class PublicEventService:
         elif time_filter == "upcoming":
             started_after = now
             
-        events, total = await PublicEventRepository.get_valid_events(
-            now=now,
-            semester_id=semester_id,
-            search=search,
-            started_after=started_after,
-            started_before=started_before,
-            skip=skip,
-            limit=limit
+        if started_after or started_before:
+            time_query = {}
+            if started_after:
+                time_query["$gte"] = started_after
+            if started_before:
+                time_query["$lte"] = started_before
+            match_filter["event_start"] = time_query
+            
+        raw_items, total = await PublicEventRepository.get_valid_with_participants(
+            match_filter=match_filter, skip=skip, limit=limit
         )
-        items = [await PublicEventService._to_public_event_read(e) for e in events]
+        items = [PublicEventRead.model_validate(item) for item in raw_items]
         return {"items": items, "total": total}
 
     @staticmethod
