@@ -24,7 +24,7 @@ router = APIRouter(prefix="/events", tags=["Event Registration"])
     response_model=EventRegistrationResponse,
     status_code=status.HTTP_201_CREATED,
 )
-@limiter.limit("100/second")
+@limiter.limit("10/second")
 async def register_public_event(
     request: Request,
     event_id: PydanticObjectId = Path(...),
